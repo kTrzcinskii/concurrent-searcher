@@ -62,6 +62,8 @@ directory_node_t *directory_list_pop_first(directories_list_t *list)
 
 void directory_list_clear(directories_list_t *list)
 {
+    if (!list)
+        return;
     while (list->count > 0)
     {
         directory_node_t *tmp = directory_list_pop_first(list);
