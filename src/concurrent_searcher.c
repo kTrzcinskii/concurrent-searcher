@@ -10,6 +10,12 @@ int main(int argc, char **argv)
     concurrent_searcher_args_t args;
     read_arguments(argc, argv, &args);
 
+    found_file_list_t file_list = found_file_list_init();
+
+    // TODO: remove hardcoded NULL with user defined option
+    print_output(&file_list, NULL);
+
+    found_file_list_clear(&file_list);
     clear_arguments(&args);
     return EXIT_SUCCESS;
 }
@@ -77,4 +83,27 @@ void clear_arguments(concurrent_searcher_args_t *args)
 {
     directory_list_clear(&args->dir_list);
     free(args->phrase);
+}
+
+void print_output(found_file_list_t *list, char *output_path)
+{
+    FILE *output_stream = NULL;
+    if (!output_path)
+        output_stream = DEFAULT_OUTPUT_STREAM;
+    else
+    {
+        output_stream = fopen(output_path, "r");
+        if (!output_stream)
+            handle_file_open_error(output_path);
+    }
+
+    found_file_node_t *current = list->head;
+    while (current)
+    {
+        fprintf(output_stream, "%s %d:%d-%d:%d", current->path, current->start_position.line, current->start_position.column, current->end_position.line, current->end_position.column);
+        current = current->next;
+    }
+
+    if (output_path && fclose(output_stream))
+        handle_file_close_error(output_path);
 }
