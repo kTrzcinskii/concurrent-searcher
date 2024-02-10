@@ -16,5 +16,7 @@
 
 void handle_file_open_error(char *file_path);
 void handle_file_close_error(char *file_path);
+void handle_dir_open_error(char *dir_path);
+void handle_dir_close_error(char *dir_path);
 
 #endif // ERROR_HANLDER
