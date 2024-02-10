@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "concurrent_searcher.h"
@@ -42,6 +43,7 @@ void usage(char *pname)
 // TODO: add option to get phrase from file
 // TODO: add option to get directories from file
 // TODO: add option to get output to the file
+// TODO: consider supporting symbolic links
 void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
 {
     char c;
@@ -203,27 +205,34 @@ void *thread_function(void *argp)
         if (pthread_mutex_unlock(args->mx_available_directory))
             ERR("ptrhead_mutex_unlock", GENERAL_ERROR);
         if (current_dir)
-            search_directory(current_dir->path, args->file_list, args->mx_file_list, args->recursively);
+            search_directory(current_dir->path, args->file_list, args->mx_file_list, args->recursively, args->phrase);
     } while (current_dir);
 
     return NULL;
 }
 
-void search_directory(char *directory_path, found_file_list_t *file_list, pthread_mutex_t *mx_file_list, int recursively)
+void search_directory(char *directory_path, found_file_list_t *file_list, pthread_mutex_t *mx_file_list, int recursively, char *phrase)
 {
     DIR *dir_stream = opendir(directory_path);
     if (!dir_stream)
         handle_dir_open_error(directory_path);
 
-    // TODO: for every normal file call function that will check if file contains phrase
     // TODO: handle recursion (create linked list of directories inside this directory, but skipping '.' and '..' and then call search_directory for each one of them)
     struct dirent *dir_entry;
+    struct stat stat_buffer;
     do
     {
         errno = 0;
         if ((dir_entry = readdir(dir_stream)) != NULL)
         {
-            fprintf(stderr, "%s\n", dir_entry->d_name);
+            char *entry_path_name = combine_paths(directory_path, dir_entry->d_name);
+            if (stat(entry_path_name, &stat_buffer))
+                ERR("stat", GENERAL_ERROR);
+
+            if (S_ISREG(stat_buffer.st_mode))
+                check_file(dir_entry->d_name, file_list, mx_file_list, phrase);
+
+            free(entry_path_name);
         }
     } while (dir_entry != NULL);
 
@@ -232,4 +241,20 @@ void search_directory(char *directory_path, found_file_list_t *file_list, pthrea
 
     if (closedir(dir_stream))
         handle_dir_close_error(directory_path);
+
+    // TODO: iterate here list of other dirs and call function recursively on them (only if recursively flag is past)
+}
+
+void check_file(char *file_path, found_file_list_t *file_list, pthread_mutex_t *mx_file_list, char *phrase)
+{
+    // TODO: go through file and check if it contains phrase
+}
+
+char *combine_paths(char *p1, char *p2)
+{
+    char *p = malloc(sizeof(char) * (strlen(p1) + strlen(p2) + 2));
+    strcpy(p, p1);
+    strcat(p, "/");
+    strcat(p, p2);
+    return p;
 }

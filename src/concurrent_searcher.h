@@ -12,6 +12,8 @@
 
 #define DEFAULT_OUTPUT_STREAM stdout
 
+#define CURRENT_DIR_PATH_BUFF 1024
+
 typedef struct concurrent_searcher_args
 {
     directories_list_t dir_list;
@@ -40,6 +42,8 @@ void destroy_thread_worker_args(thread_worker_args_t *args, size_t threads_num);
 void create_threads(thread_worker_args_t *worker_args, void *(*start_function)(void *), size_t threads_num);
 void join_threads(thread_worker_args_t *threads, size_t threads_num);
 void *thread_function(void *argp);
-void search_directory(char *directory_path, found_file_list_t *file_list, pthread_mutex_t *mx_file_list, int recursively);
+void search_directory(char *directory_path, found_file_list_t *file_list, pthread_mutex_t *mx_file_list, int recursively, char *phrase);
+void check_file(char *file_path, found_file_list_t *file_list, pthread_mutex_t *mx_file_list, char *phrase);
+char *combine_paths(char *p1, char *p2);
 
 #endif // CONCURRENT_SEARCHER
