@@ -29,7 +29,17 @@ file_content_t load_file(char *file_path)
             if (!lines)
                 ERR("realloc", GENERAL_ERROR);
         }
-        line[strlen(line) - 1] = '\0'; // remove endline from the line
+
+        // replace endline with spacebar
+        // it will be useful when user pass phrase "some example"
+        // and in the file we will have
+        // "...... some"
+        // "example ...."
+        // we want to catch it, but we don't want to catch
+        // "someexample"
+        if (line[strlen(line) - 1] == '\n')
+            line[strlen(line) - 1] = ' ';
+
         char *p = malloc(sizeof(char) * (strlen(line) + 1));
         if (!p)
             ERR("malloc", ALLOCATION_ERROR);
@@ -52,20 +62,46 @@ file_content_t load_file(char *file_path)
 
 char file_content_at(file_content_t file, size_t index)
 {
-    // TODO:
-    return 0;
+    file_position_t pos = index_to_position(file, index);
+    if (pos.column == -1)
+        ERR("index_to_position", GENERAL_ERROR);
+    return file.lines[pos.line][pos.column];
 }
 
 size_t position_to_index(file_content_t file, file_position_t file_position)
 {
-    // TODO:
-    return 0;
+    size_t index = 0;
+
+    if (file_position.line >= file.lines_num)
+        return -1;
+
+    if (file_position.column >= strlen(file.lines[file_position.line]))
+        return -1;
+
+    for (size_t i = 0; i < file_position.line; i++)
+        index += strlen(file.lines[i]);
+    index += file_position.column;
+
+    return index;
 }
 
 file_position_t index_to_position(file_content_t file, size_t index)
 {
-    // TODO:
     file_position_t position = {.column = -1, .line = -1};
+
+    if (index > file.characters_num)
+        return position;
+
+    size_t current_line_id = 0;
+    while (current_line_id < file.lines_num && index >= strlen(file.lines[current_line_id]))
+        index -= strlen(file.lines[current_line_id++]);
+
+    if (current_line_id >= file.lines_num)
+        return position;
+
+    position.line = current_line_id;
+    position.column = index;
+
     return position;
 }
 
