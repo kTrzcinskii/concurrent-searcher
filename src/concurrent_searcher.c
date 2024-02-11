@@ -7,6 +7,7 @@
 
 #include "concurrent_searcher.h"
 #include "error_handler.h"
+#include "file_content.h"
 
 int main(int argc, char **argv)
 {
@@ -240,7 +241,7 @@ void search_directory(char *directory_path, found_file_list_t *file_list, pthrea
                 ERR("stat", GENERAL_ERROR);
 
             if (S_ISREG(stat_buffer.st_mode))
-                check_file(dir_entry->d_name, file_list, mx_file_list, phrase);
+                check_file(entry_path_name, file_list, mx_file_list, phrase);
 
             if (recursively && S_ISDIR(stat_buffer.st_mode) && strcmp(dir_entry->d_name, ".") && strcmp(dir_entry->d_name, ".."))
                 directory_list_push_back(&dir_list, entry_path_name);
@@ -269,7 +270,12 @@ void search_directory(char *directory_path, found_file_list_t *file_list, pthrea
 
 void check_file(char *file_path, found_file_list_t *file_list, pthread_mutex_t *mx_file_list, char *phrase)
 {
-    // TODO: go through file and check if it contains phrase
+    file_content_t file_content = load_file(file_path);
+    fprintf(stderr, "%ld\n", file_content.lines_num);
+    for (size_t i = 0; i < file_content.lines_num; i++)
+        fprintf(stderr, "[line %ld] %s\n", i, file_content.lines[i]);
+    // TODO: find phrase in file
+    file_content_clear(file_content);
 }
 
 char *combine_paths(char *p1, char *p2)

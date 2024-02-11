@@ -3,11 +3,7 @@
 
 #include <stdlib.h>
 
-typedef struct file_position
-{
-    int line;
-    int column;
-} file_position_t;
+#include "file_content.h"
 
 typedef struct found_file_node
 {
