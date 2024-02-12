@@ -20,6 +20,7 @@ typedef struct concurrent_searcher_args
     char *phrase;
     size_t threads_num;
     int recursively;
+    char *output_path;
 } concurrent_searcher_args_t;
 
 typedef struct thread_worker_args

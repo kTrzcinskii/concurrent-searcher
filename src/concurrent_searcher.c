@@ -23,8 +23,7 @@ int main(int argc, char **argv)
     join_threads(worker_args, args.threads_num);
     destroy_thread_worker_args(worker_args, args.threads_num);
 
-    // TODO: remove hardcoded NULL with user defined option
-    print_output(&file_list, NULL);
+    print_output(&file_list, args.output_path);
 
     found_file_list_clear(&file_list);
     clear_arguments(&args);
@@ -33,17 +32,17 @@ int main(int argc, char **argv)
 
 void usage(char *pname)
 {
-    fprintf(stderr, "USAGE: %s [-r] [-t threads_num] -p phrase directories\n", pname);
-    fprintf(stderr, "r - search directories recursively\n");
-    fprintf(stderr, "threads_num - number of threads to be created to concurrently search through directories. Default value is minimum from number of provided directories and max range [integer from range %d-%d]\n", MIN_THREADS_NUM, MAX_THREADS_NUM);
+    fprintf(stderr, "USAGE: %s [-r] [-t threads_num] [-o output_path] [-p phrase] directories\n", pname);
+    fprintf(stderr, "(optional) r - search directories recursively\n");
+    fprintf(stderr, "(optional) threads_num - number of threads to be created to concurrently search through directories. Default value is minimum from number of provided directories and max range [integer from range %d-%d]\n", MIN_THREADS_NUM, MAX_THREADS_NUM);
+    fprintf(stderr, "(optional) output_path - path to file in which program result should be stored. When no path is provided stdout is used\n");
     fprintf(stderr, "phrase - phrase to be looked for inside every file in provided directories\n");
-    fprintf(stderr, "directories - path to directories (separated by spaces) in which files should be checked\n");
+    fprintf(stderr, "directories - paths to directories (separated by spaces) in which files should be checked\n");
     exit(EXIT_FAILURE);
 }
 
 // TODO: add option to get phrase from file
 // TODO: add option to get directories from file
-// TODO: add option to get output to the file
 // TODO: consider supporting symbolic links
 void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
 {
@@ -51,8 +50,9 @@ void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
     int is_recursive = 0;
     size_t threads_num = 0;
     char *p = NULL;
+    char *o = NULL;
 
-    while ((c = getopt(argc, argv, "rt:p:")) != -1)
+    while ((c = getopt(argc, argv, "rt:p:o:")) != -1)
     {
         switch (c)
         {
@@ -69,6 +69,12 @@ void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
             if (!p)
                 ERR("malloc", ALLOCATION_ERROR);
             strcpy(p, optarg);
+            break;
+        case 'o':
+            o = malloc(sizeof(char) * (strlen(optarg) + 1));
+            if (!o)
+                ERR("malloc", ALLOCATION_ERROR);
+            strcpy(o, optarg);
             break;
         case '?':
             usage(argv[0]);
@@ -89,12 +95,14 @@ void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
     args->recursively = is_recursive;
     args->threads_num = threads_num == 0 ? list.count : threads_num;
     args->phrase = p;
+    args->output_path = o;
 }
 
 void clear_arguments(concurrent_searcher_args_t *args)
 {
     directory_list_clear(&args->dir_list);
     free(args->phrase);
+    free(args->output_path);
 }
 
 void print_output(found_file_list_t *list, char *output_path)
@@ -104,11 +112,12 @@ void print_output(found_file_list_t *list, char *output_path)
         output_stream = DEFAULT_OUTPUT_STREAM;
     else
     {
-        output_stream = fopen(output_path, "r");
+        output_stream = fopen(output_path, "w");
         if (!output_stream)
             handle_file_open_error(output_path);
     }
 
+    fprintf(output_stream, "%ld\n", list->count);
     found_file_node_t *current = list->head;
     while (current)
     {
