@@ -3,7 +3,7 @@
 #include "error_handler.h"
 #include "file_content.h"
 
-file_content_t load_file(char *file_path)
+file_content_t load_file(char *file_path, load_mode_t load_mode)
 {
     if (!file_path)
         ERR("empty file_path", GENERAL_ERROR);
@@ -30,15 +30,16 @@ file_content_t load_file(char *file_path)
                 ERR("realloc", GENERAL_ERROR);
         }
 
-        // replace endline with spacebar
-        // it will be useful when user pass phrase "some example"
-        // and in the file we will have
-        // "...... some"
-        // "example ...."
-        // we want to catch it, but we don't want to catch
-        // "someexample"
-        if (line[strlen(line) - 1] == '\n')
-            line[strlen(line) - 1] = ' ';
+        if (load_mode != LOAD_MODE_BASIC)
+        {
+            if (line[strlen(line) - 1] == '\n')
+            {
+                if (load_mode == LOAD_MODE_CHANGE_N_TO_SPACE)
+                    line[strlen(line) - 1] = ' ';
+                else
+                    line[strlen(line) - 1] = '\0';
+            }
+        }
 
         char *p = malloc(sizeof(char) * (strlen(line) + 1));
         if (!p)

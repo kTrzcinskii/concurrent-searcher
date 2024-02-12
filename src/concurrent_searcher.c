@@ -32,18 +32,18 @@ int main(int argc, char **argv)
 
 void usage(char *pname)
 {
-    fprintf(stderr, "USAGE: %s [-r] [-t threads_num] [-o output_path] [-p phrase] [-i input_path] directories\n", pname);
+    fprintf(stderr, "USAGE: %s [-r] [-t threads_num] [-o output_path] [-p phrase] [-i input_path] [-d dir_path] directories\n", pname);
     fprintf(stderr, "(optional) r - search directories recursively\n");
     fprintf(stderr, "(optional) threads_num - number of threads to be created to concurrently search through directories. Default value is minimum from number of provided directories and max range [integer from range %d-%d]\n", MIN_THREADS_NUM, MAX_THREADS_NUM);
     fprintf(stderr, "(optional) output_path - path to file in which program result should be stored. When no path is provided stdout is used\n");
     fprintf(stderr, "phrase - phrase to be looked for inside every file in provided directories\n");
     fprintf(stderr, "input_path - path to file which content will be looked for inside every file in provided directories\n");
-    fprintf(stderr, "directories - paths to directories (separated by spaces) in which files should be checked\n");
+    fprintf(stderr, "(optional) dir_path - path fo file with directories (each one in new line) in which files should be checked. They are appended to list of other directories provided in command line\n");
+    fprintf(stderr, "directories - paths to directories (separated by spaces) in which files should be checked.\n");
     fprintf(stderr, "Important note: if both phrase and input_path are provided then phrase is used. One of those argument must be passed in order to start program.");
     exit(EXIT_FAILURE);
 }
 
-// TODO: add option to get directories from file
 // TODO: consider supporting symbolic links
 void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
 {
@@ -53,8 +53,9 @@ void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
     char *p = NULL;
     char *o = NULL;
     char *i = NULL;
+    char *d = NULL;
 
-    while ((c = getopt(argc, argv, "rt:p:o:i:")) != -1)
+    while ((c = getopt(argc, argv, "rt:p:o:i:d:")) != -1)
     {
         switch (c)
         {
@@ -84,6 +85,12 @@ void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
                 ERR("malloc", ALLOCATION_ERROR);
             strcpy(i, optarg);
             break;
+        case 'd':
+            d = malloc(sizeof(char) * (strlen(optarg) + 1));
+            if (!d)
+                ERR("malloc", ALLOCATION_ERROR);
+            strcpy(d, optarg);
+            break;
         case '?':
             usage(argv[0]);
             break;
@@ -99,14 +106,24 @@ void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
         if ((err = directory_list_push_back(&list, argv[i])) != 0)
             ERR("directory_list_push_back", err);
 
+    if (d)
+    {
+        file_content_t dir_content = load_file(d, LOAD_MODE_REMOVE_N);
+        for (size_t i = 0; i < dir_content.lines_num; i++)
+            if ((err = directory_list_push_back(&list, dir_content.lines[i])) != 0)
+                ERR("directory_list_push_back", err);
+        file_content_clear(dir_content);
+    }
+
     if (!p)
     {
-        file_content_t input_content = load_file(i);
+        file_content_t input_content = load_file(i, LOAD_MODE_CHANGE_N_TO_SPACE);
         p = file_content_to_string(input_content);
         file_content_clear(input_content);
     }
 
     free(i);
+    free(d);
     args->dir_list = list;
     args->recursively = is_recursive;
     args->threads_num = threads_num == 0 ? list.count : threads_num;
@@ -295,7 +312,7 @@ void search_directory(char *directory_path, found_file_list_t *file_list, pthrea
 
 void check_file(char *file_path, found_file_list_t *file_list, pthread_mutex_t *mx_file_list, char *phrase)
 {
-    file_content_t file_content = load_file(file_path);
+    file_content_t file_content = load_file(file_path, LOAD_MODE_CHANGE_N_TO_SPACE);
 
     size_t positions_count = 0;
     file_position_t *starting_positions = find_in_file_kmp(file_content, phrase, &positions_count);
