@@ -197,3 +197,14 @@ file_position_t *find_in_file_kmp(file_content_t file, char *phrase, size_t *cou
     free(lps);
     return positions;
 }
+
+char *file_content_to_string(file_content_t file)
+{
+    char *string = malloc(sizeof(char) * (file.characters_num + 1));
+    if (!string)
+        ERR("malloc", ALLOCATION_ERROR);
+    string[0] = '\0';
+    for (size_t i = 0; i < file.lines_num; i++)
+        strcat(string, file.lines[i]);
+    return string;
+}

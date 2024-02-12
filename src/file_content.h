@@ -23,5 +23,6 @@ file_position_t index_to_position(file_content_t file, size_t index);
 void file_content_clear(file_content_t file);
 size_t *create_lps_table(char *phrase);
 file_position_t *find_in_file_kmp(file_content_t file, char *phrase, size_t *count);
+char *file_content_to_string(file_content_t file);
 
 #endif // FILE_CONTENT
