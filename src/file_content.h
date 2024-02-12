@@ -5,8 +5,8 @@
 
 typedef struct file_position
 {
-    int line;
-    int column;
+    size_t line;
+    size_t column;
 } file_position_t;
 
 typedef struct file_content
@@ -22,6 +22,6 @@ size_t position_to_index(file_content_t file, file_position_t file_position);
 file_position_t index_to_position(file_content_t file, size_t index);
 void file_content_clear(file_content_t file);
 size_t *create_lps_table(char *phrase);
-file_position_t *find_in_file_kmp(file_content_t file, char *phrase);
+file_position_t *find_in_file_kmp(file_content_t file, char *phrase, size_t *count);
 
 #endif // FILE_CONTENT

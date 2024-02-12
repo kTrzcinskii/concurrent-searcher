@@ -112,7 +112,7 @@ void print_output(found_file_list_t *list, char *output_path)
     found_file_node_t *current = list->head;
     while (current)
     {
-        fprintf(output_stream, "%s %d:%d-%d:%d", current->path, current->start_position.line, current->start_position.column, current->end_position.line, current->end_position.column);
+        fprintf(output_stream, "%s %ld:%ld-%ld:%ld\n", current->path, current->start_position.line, current->start_position.column, current->end_position.line, current->end_position.column);
         current = current->next;
     }
 
@@ -271,11 +271,29 @@ void search_directory(char *directory_path, found_file_list_t *file_list, pthrea
 void check_file(char *file_path, found_file_list_t *file_list, pthread_mutex_t *mx_file_list, char *phrase)
 {
     file_content_t file_content = load_file(file_path);
-    fprintf(stderr, "%ld\n", file_content.lines_num);
-    for (size_t i = 0; i < file_content.lines_num; i++)
-        fprintf(stderr, "[line %ld] %s\n", i, file_content.lines[i]);
-    // TODO: find phrase in file
+
+    size_t positions_count = 0;
+    file_position_t *starting_positions = find_in_file_kmp(file_content, phrase, &positions_count);
+    if (positions_count == 0)
+    {
+        file_content_clear(file_content);
+        return;
+    }
+
+    file_position_t *ending_positions = malloc(sizeof(file_position_t) * positions_count);
+    for (size_t i = 0; i < positions_count; i++)
+        ending_positions[i] = index_to_position(file_content, position_to_index(file_content, starting_positions[i]) + strlen(phrase) - 1);
+
+    if (pthread_mutex_lock(mx_file_list))
+        ERR("pthread_mutex_lock", GENERAL_ERROR);
+    for (size_t i = 0; i < positions_count; i++)
+        found_file_list_push_back(file_list, file_path, starting_positions[i], ending_positions[i]);
+    if (pthread_mutex_unlock(mx_file_list))
+        ERR("pthread_mutex_unlock", GENERAL_ERROR);
+
     file_content_clear(file_content);
+    free(starting_positions);
+    free(ending_positions);
 }
 
 char *combine_paths(char *p1, char *p2)

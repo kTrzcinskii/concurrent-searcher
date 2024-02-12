@@ -112,14 +112,88 @@ void file_content_clear(file_content_t file)
     free(file.lines);
 }
 
+// Create lps table for kmp algorithm
 size_t *create_lps_table(char *phrase)
 {
-    // TODO:
-    return NULL;
+    size_t *lps = malloc(sizeof(size_t) * strlen(phrase));
+    if (!lps)
+        ERR("malloc", ALLOCATION_ERROR);
+
+    lps[0] = 0;
+
+    // current longest proper prefix
+    size_t clp = 0;
+    for (size_t i = 1; i < strlen(phrase); i++)
+    {
+        if (phrase[i] == phrase[clp])
+        {
+            clp++;
+            lps[i] = clp;
+        }
+        else
+        {
+            if (clp > 0)
+            {
+                clp = lps[clp - 1];
+                i--;
+            }
+            else
+                lps[i] = 0;
+        }
+    }
+
+    return lps;
 }
 
-file_position_t *find_in_file_kmp(file_content_t file, char *phrase)
+// Return array of starting positions of phrase in file
+file_position_t *find_in_file_kmp(file_content_t file, char *phrase, size_t *count)
 {
-    // TODO:
-    return NULL;
+    // Use Knuth-Morris-Pratt algorithm
+
+    size_t *lps = create_lps_table(phrase);
+    *count = 0;
+    size_t capacity = 1;
+
+    file_position_t *positions = malloc(sizeof(file_position_t) * capacity);
+    if (!positions)
+        ERR("malloc", ALLOCATION_ERROR);
+
+    size_t i = 0; // index of current element in file content
+    size_t j = 0; // index of current element in phrase
+    size_t n = file.characters_num;
+    size_t m = strlen(phrase);
+
+    while ((n - i) >= (m - j))
+    {
+        if (phrase[j] == file_content_at(file, i))
+        {
+            j++;
+            i++;
+        }
+
+        if (j == m)
+        {
+            if (*count == capacity)
+            {
+                capacity *= 2;
+                positions = realloc(positions, sizeof(file_position_t) * capacity);
+            }
+            positions[*count] = index_to_position(file, i - j);
+            (*count)++;
+            j = lps[j - 1];
+        }
+        else if (i < n && phrase[j] != file_content_at(file, i))
+        {
+            if (j != 0)
+                j = lps[j - 1];
+            else
+                i++;
+        }
+    }
+
+    if ((*count) == 0)
+        free(positions);
+
+    free(lps);
+    return positions;
 }
