@@ -67,7 +67,11 @@ where each `entry` is of form:
 ```
 
 ## Implementation
-TODO
+- To store directories and files in which `Phrase` was found I used the very basic type of linked-list (`directories_list_t` and `found_files_list_t`).
+- To search for phrase in files I used Knuth-Morris-Pratt algorithm.
+- To implement multi-threading I used `pthread` library.
 
 ## References
-TODO
+- [Wikipedia - Knuth–Morris–Pratt algorithm](https://en.wikipedia.org/wiki/Knuth%E2%80%93Morris%E2%80%93Pratt_algorithm)
+- [AbdulBari - 9.1 Knuth-Morris-Pratt KMP String Matching Algorithm](https://www.youtube.com/watch?v=V5-7GzOfADQ&ab_channel=AbdulBari)
+- [GeeksForGeeks - KMP Algorithm for Pattern Searching](https://www.geeksforgeeks.org/kmp-algorithm-for-pattern-searching/)
