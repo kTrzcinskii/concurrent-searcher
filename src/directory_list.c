@@ -21,13 +21,12 @@ int directory_list_push_back(directories_list_t *list, const char *path)
     if (!node)
         return ALLOCATION_ERROR;
 
-    char *node_path = malloc(sizeof(char) * (strlen(path) + 1));
+    char *node_path = strdup(path);
     if (!node_path)
     {
         free(node);
-        return ALLOCATION_ERROR;
+        return GENERAL_ERROR;
     }
-    strcpy(node_path, path);
 
     node->path = node_path;
     node->next = NULL;

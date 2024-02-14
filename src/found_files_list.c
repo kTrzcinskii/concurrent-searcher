@@ -21,13 +21,12 @@ int found_file_list_push_back(found_file_list_t *list, char *path, file_position
     if (!node)
         return ALLOCATION_ERROR;
 
-    char *p = malloc(sizeof(char) * (strlen(path) + 1));
+    char *p = strdup(path);
     if (!p)
     {
         free(node);
-        return ALLOCATION_ERROR;
+        return GENERAL_ERROR;
     }
-    strcpy(p, path);
 
     node->path = p;
     node->next = NULL;

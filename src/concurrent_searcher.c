@@ -68,28 +68,24 @@ void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
                 usage(argv[0]);
             break;
         case 'p':
-            p = malloc(sizeof(char) * (strlen(optarg) + 1));
+            p = strdup(optarg);
             if (!p)
-                ERR("malloc", ALLOCATION_ERROR);
-            strcpy(p, optarg);
+                ERR("strdup", GENERAL_ERROR);
             break;
         case 'o':
-            o = malloc(sizeof(char) * (strlen(optarg) + 1));
+            o = strdup(optarg);
             if (!o)
-                ERR("malloc", ALLOCATION_ERROR);
-            strcpy(o, optarg);
+                ERR("strdup", GENERAL_ERROR);
             break;
         case 'i':
-            i = malloc(sizeof(char) * (strlen(optarg) + 1));
+            i = strdup(optarg);
             if (!i)
-                ERR("malloc", ALLOCATION_ERROR);
-            strcpy(i, optarg);
+                ERR("strdup", GENERAL_ERROR);
             break;
         case 'd':
-            d = malloc(sizeof(char) * (strlen(optarg) + 1));
+            d = strdup(optarg);
             if (!d)
-                ERR("malloc", ALLOCATION_ERROR);
-            strcpy(d, optarg);
+                ERR("strdup", GENERAL_ERROR);
             break;
         case '?':
             usage(argv[0]);
@@ -195,10 +191,9 @@ void initialize_thread_worker_args(thread_worker_args_t **args, directories_list
 
     for (size_t i = 0; i < threads_num; i++)
     {
-        char *p = malloc(sizeof(char) * (strlen(phrase) + 1));
+        char *p = strdup(phrase);
         if (!p)
-            ERR("malloc", ALLOCATION_ERROR);
-        strcpy(p, phrase);
+            ERR("strdup", ALLOCATION_ERROR);
         (*args)[i].mx_available_directory = mx_available_directory;
         (*args)[i].mx_file_list = mx_file_list;
         (*args)[i].available_directory = dir_head;

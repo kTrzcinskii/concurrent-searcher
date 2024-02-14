@@ -30,7 +30,8 @@ file_content_t load_file(char *file_path, load_mode_t load_mode)
                 ERR("realloc", GENERAL_ERROR);
         }
 
-        if (load_mode != LOAD_MODE_BASIC)
+        // strlen(line) > 0 to fix problem with files that could have \0 as first symbol (probably some binaries)
+        if (load_mode != LOAD_MODE_BASIC && strlen(line) > 0)
         {
             if (line[strlen(line) - 1] == '\n')
             {
@@ -41,10 +42,9 @@ file_content_t load_file(char *file_path, load_mode_t load_mode)
             }
         }
 
-        char *p = malloc(sizeof(char) * (strlen(line) + 1));
+        char *p = strdup(line);
         if (!p)
-            ERR("malloc", ALLOCATION_ERROR);
-        strcpy(p, line);
+            ERR("strdup", GENERAL_ERROR);
         lines[lines_num++] = p;
         characters_num += strlen(line);
     }
