@@ -17,7 +17,7 @@ int main(int argc, char **argv)
     found_file_list_t file_list = found_file_list_init();
 
     thread_worker_args_t *worker_args;
-    initialize_thread_worker_args(&worker_args, &args.dir_list, &file_list, args.recursively, args.phrase, args.threads_num, args.follow_symlinks);
+    initialize_thread_worker_args(&worker_args, &args.entry_list, &file_list, args.recursively, args.phrase, args.threads_num, args.follow_symlinks);
 
     create_threads(worker_args, thread_function, args.threads_num);
     join_threads(worker_args, args.threads_num);
@@ -32,15 +32,15 @@ int main(int argc, char **argv)
 
 void usage(char *pname)
 {
-    fprintf(stderr, "USAGE: %s [-r] [-s] [-t threads_num] [-o output_path] [-p phrase] [-i input_path] [-d dir_path] directories\n", pname);
+    fprintf(stderr, "USAGE: %s [-r] [-s] [-t threads_num] [-o output_path] [-p phrase] [-i input_path] [-e entries_path] <...entries>\n", pname);
     fprintf(stderr, "(optional) r - search directories recursively\n");
     fprintf(stderr, "(optional) s - follow symlinks\n");
     fprintf(stderr, "(optional) threads_num - number of threads to be created to concurrently search through directories. Default value is minimum from number of provided directories and max range [integer from range %d-%d]\n", MIN_THREADS_NUM, MAX_THREADS_NUM);
     fprintf(stderr, "(optional) output_path - path to file in which program result should be stored. When no path is provided stdout is used\n");
     fprintf(stderr, "phrase - phrase to be looked for inside every file in provided directories\n");
     fprintf(stderr, "input_path - path to file which content will be looked for inside every file in provided directories\n");
-    fprintf(stderr, "(optional) dir_path - path fo file with directories (each one in new line) in which files should be checked. They are appended to list of other directories provided in command line\n");
-    fprintf(stderr, "directories - paths to directories (separated by spaces) in which files should be checked.\n");
+    fprintf(stderr, "(optional) entries_path - path fo file with entries (each one in new line) which are appended to list of other entries provided in command line\n");
+    fprintf(stderr, "entries - paths to files or directories (separated by spaces), in which phrase should be looked for. If entry is directory, then its every file is considered to be an entry. If entry is file, then it't content is checked.\n");
     fprintf(stderr, "Important note: if both phrase and input_path are provided then phrase is used. One of those argument must be passed in order to start program.");
     exit(EXIT_FAILURE);
 }
@@ -54,9 +54,9 @@ void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
     char *p = NULL;
     char *o = NULL;
     char *i = NULL;
-    char *d = NULL;
+    char *e = NULL;
 
-    while ((c = getopt(argc, argv, "rt:p:o:i:d:s")) != -1)
+    while ((c = getopt(argc, argv, "rt:p:o:i:e:s")) != -1)
     {
         switch (c)
         {
@@ -84,8 +84,8 @@ void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
                 ERR("strdup", GENERAL_ERROR);
             break;
         case 'd':
-            d = strdup(optarg);
-            if (!d)
+            e = strdup(optarg);
+            if (!e)
                 ERR("strdup", GENERAL_ERROR);
             break;
         case 's':
@@ -106,13 +106,13 @@ void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
         if ((err = entry_list_push_back(&list, argv[i])) != 0)
             ERR("entry_list_push_back", err);
 
-    if (d)
+    if (e)
     {
-        file_content_t dir_content = load_file(d, LOAD_MODE_REMOVE_N);
-        for (size_t i = 0; i < dir_content.lines_num; i++)
-            if ((err = entry_list_push_back(&list, dir_content.lines[i])) != 0)
+        file_content_t entry_list_content = load_file(e, LOAD_MODE_REMOVE_N);
+        for (size_t i = 0; i < entry_list_content.lines_num; i++)
+            if ((err = entry_list_push_back(&list, entry_list_content.lines[i])) != 0)
                 ERR("entry_list_push_back", err);
-        file_content_clear(dir_content);
+        file_content_clear(entry_list_content);
     }
 
     if (!p)
@@ -123,8 +123,8 @@ void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
     }
 
     free(i);
-    free(d);
-    args->dir_list = list;
+    free(e);
+    args->entry_list = list;
     args->recursively = is_recursive;
     args->threads_num = threads_num == 0 ? list.count : threads_num;
     args->phrase = p;
@@ -134,7 +134,7 @@ void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
 
 void clear_arguments(concurrent_searcher_args_t *args)
 {
-    entry_list_clear(&args->dir_list);
+    entry_list_clear(&args->entry_list);
     free(args->phrase);
     free(args->output_path);
 }
@@ -163,45 +163,45 @@ void print_output(found_file_list_t *list, char *output_path)
         handle_file_close_error(output_path);
 }
 
-void initialize_thread_worker_args(thread_worker_args_t **args, entry_list_t *dir_list, found_file_list_t *file_list, int recursively, char *phrase, size_t threads_num, int follow_symlinks)
+void initialize_thread_worker_args(thread_worker_args_t **args, entry_list_t *entry_list, found_file_list_t *file_list, int recursively, char *phrase, size_t threads_num, int follow_symlinks)
 {
-    pthread_mutex_t *mx_available_directory = malloc(sizeof(pthread_mutex_t));
-    if (!mx_available_directory)
+    pthread_mutex_t *mx_available_entry = malloc(sizeof(pthread_mutex_t));
+    if (!mx_available_entry)
         ERR("malloc", ALLOCATION_ERROR);
     pthread_mutex_t *mx_file_list = malloc(sizeof(pthread_mutex_t));
     if (!mx_file_list)
     {
-        free(mx_available_directory);
+        free(mx_available_entry);
         ERR("malloc", ALLOCATION_ERROR);
     }
 
     *args = malloc(sizeof(thread_worker_args_t) * threads_num);
     if (!(*args))
     {
-        free(mx_available_directory);
+        free(mx_available_entry);
         free(mx_file_list);
         ERR("malloc", ALLOCATION_ERROR);
     }
 
-    if (pthread_mutex_init(mx_available_directory, NULL))
+    if (pthread_mutex_init(mx_available_entry, NULL))
         ERR("pthread_mutex_init", GENERAL_ERROR);
     if (pthread_mutex_init(mx_file_list, NULL))
         ERR("pthread_mutex_init", GENERAL_ERROR);
 
-    entry_node_t **dir_head = malloc(sizeof(entry_node_t *));
-    if (!dir_head)
+    entry_node_t **entry_list_head = malloc(sizeof(entry_node_t *));
+    if (!entry_list_head)
         ERR("malloc", ALLOCATION_ERROR);
 
-    *dir_head = dir_list->head;
+    *entry_list_head = entry_list->head;
 
     for (size_t i = 0; i < threads_num; i++)
     {
         char *p = strdup(phrase);
         if (!p)
             ERR("strdup", ALLOCATION_ERROR);
-        (*args)[i].mx_available_directory = mx_available_directory;
+        (*args)[i].mx_available_entry = mx_available_entry;
         (*args)[i].mx_file_list = mx_file_list;
-        (*args)[i].available_directory = dir_head;
+        (*args)[i].available_entry = entry_list_head;
         (*args)[i].file_list = file_list;
         (*args)[i].recursively = recursively;
         (*args)[i].phrase = p;
@@ -211,13 +211,13 @@ void initialize_thread_worker_args(thread_worker_args_t **args, entry_list_t *di
 
 void destroy_thread_worker_args(thread_worker_args_t *args, size_t threads_num)
 {
-    if (pthread_mutex_destroy(args[0].mx_available_directory))
+    if (pthread_mutex_destroy(args[0].mx_available_entry))
         ERR("pthread_mutex_destroy", GENERAL_ERROR);
     if (pthread_mutex_destroy(args[0].mx_file_list))
         ERR("pthread_mutex_destroy", GENERAL_ERROR);
-    free(args[0].mx_available_directory);
+    free(args[0].mx_available_entry);
     free(args[0].mx_file_list);
-    free(args[0].available_directory);
+    free(args[0].available_entry);
 
     for (size_t i = 0; i < threads_num; i++)
         free(args[i].phrase);
@@ -245,19 +245,36 @@ void *thread_function(void *argp)
     thread_worker_args_t *args = argp;
 
     // search next available path
-    entry_node_t *current_dir = NULL;
+    entry_node_t *current_entry = NULL;
+
+    struct stat stat_buffer;
     do
     {
-        if (pthread_mutex_lock(args->mx_available_directory))
+        if (pthread_mutex_lock(args->mx_available_entry))
             ERR("pthread_mutex_lock", GENERAL_ERROR);
-        current_dir = *(args->available_directory);
-        if (current_dir)
-            *(args->available_directory) = current_dir->next;
-        if (pthread_mutex_unlock(args->mx_available_directory))
+        current_entry = *(args->available_entry);
+        if (current_entry)
+            *(args->available_entry) = current_entry->next;
+        if (pthread_mutex_unlock(args->mx_available_entry))
             ERR("ptrhead_mutex_unlock", GENERAL_ERROR);
-        if (current_dir)
-            search_directory(current_dir->path, args->file_list, args->mx_file_list, args->recursively, args->phrase, args->follow_symlinks);
-    } while (current_dir);
+        if (current_entry)
+        {
+            if (args->follow_symlinks)
+            {
+                if (stat(current_entry->path, &stat_buffer))
+                    ERR("stat", GENERAL_ERROR);
+            }
+            else
+            {
+                if (lstat(current_entry->path, &stat_buffer))
+                    ERR("lstat", GENERAL_ERROR);
+            }
+            if (S_ISREG(stat_buffer.st_mode))
+                check_file(current_entry->path, args->file_list, args->mx_file_list, args->phrase);
+            else
+                search_directory(current_entry->path, args->file_list, args->mx_file_list, args->recursively, args->phrase, args->follow_symlinks);
+        }
+    } while (current_entry);
 
     return NULL;
 }

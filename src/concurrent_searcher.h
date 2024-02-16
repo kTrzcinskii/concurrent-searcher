@@ -16,7 +16,7 @@
 
 typedef struct concurrent_searcher_args
 {
-    entry_list_t dir_list;
+    entry_list_t entry_list;
     char *phrase;
     size_t threads_num;
     int recursively;
@@ -27,8 +27,8 @@ typedef struct concurrent_searcher_args
 typedef struct thread_worker_args
 {
     pthread_t tid;
-    entry_node_t **available_directory;
-    pthread_mutex_t *mx_available_directory;
+    entry_node_t **available_entry;
+    pthread_mutex_t *mx_available_entry;
     found_file_list_t *file_list;
     pthread_mutex_t *mx_file_list;
     int recursively;
@@ -40,7 +40,7 @@ void usage(char *pname);
 void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args);
 void clear_arguments(concurrent_searcher_args_t *args);
 void print_output(found_file_list_t *list, char *output_path);
-void initialize_thread_worker_args(thread_worker_args_t **args, entry_list_t *dir_list, found_file_list_t *file_list, int recursively, char *phrase, size_t threads_num, int follow_symlinks);
+void initialize_thread_worker_args(thread_worker_args_t **args, entry_list_t *entry_list, found_file_list_t *file_list, int recursively, char *phrase, size_t threads_num, int follow_symlinks);
 void destroy_thread_worker_args(thread_worker_args_t *args, size_t threads_num);
 void create_threads(thread_worker_args_t *worker_args, void *(*start_function)(void *), size_t threads_num);
 void join_threads(thread_worker_args_t *threads, size_t threads_num);
