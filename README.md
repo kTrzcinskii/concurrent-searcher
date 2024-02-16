@@ -33,9 +33,13 @@ Compiled file is waiting for being used at `./build/concurrent_searcher`.
 | Output path      | -o     | Path to file, in which program output should be stored. If no path is provided then output is returned using stdout.       | Yes            | string               | Yes      |
 | Directories path | -d     | Path to file, which every line should be added as new entry in `Directories`.                                              | Yes            | string               | Yes      |
 | Threads number   | -t     | Number of threads to be initialized. Default value is minimum of max range number (16) and number of provided directories. | Yes            | number in range 1-16 | Yes      |
+| Follow symlinks  | -s     | If passed then symlinks are followed (otherwise they're ignored).                                                          | No            | - | Yes      |
 
-**Important note**: always one of parameters `Phrase` and `Input path` must be passed. If both are passed then only `Phrase` is used.
+**Important notes**: 
+ - always one of parameters `Phrase` and `Input path` must be passed. If both are passed then only `Phrase` is used.
+ - If `Follow symlinks` is passed and it points to a file that is also checked during program runtime then **both** original file and symlink paths will be in the output. 
 
+**Examples**:
  - Basic example - searching for "i love/hate c" in every file in directory `./very_cool_directory` recursively:
     ```shell
     ./build/concurrent_searcher -r -p "i love/hate c" ./very_cool_directory
