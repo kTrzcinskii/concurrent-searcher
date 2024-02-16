@@ -1,23 +1,23 @@
 #include <string.h>
 
-#include "directory_list.h"
+#include "entry_list.h"
 #include "error_handler.h"
 
-directories_list_t directory_list_init()
+entry_list_t entry_list_init()
 {
-    directories_list_t list;
+    entry_list_t list;
     list.count = 0;
     list.head = NULL;
     list.tail = NULL;
     return list;
 }
 
-int directory_list_push_back(directories_list_t *list, const char *path)
+int entry_list_push_back(entry_list_t *list, const char *path)
 {
     if (!list)
         return GENERAL_ERROR;
 
-    directory_node_t *node = malloc(sizeof(directory_node_t));
+    entry_node_t *node = malloc(sizeof(entry_node_t));
     if (!node)
         return ALLOCATION_ERROR;
 
@@ -46,11 +46,11 @@ int directory_list_push_back(directories_list_t *list, const char *path)
     return 0;
 }
 
-directory_node_t *directory_list_pop_first(directories_list_t *list)
+entry_node_t *entry_list_pop_first(entry_list_t *list)
 {
     if (!list || list->count == 0)
         return NULL;
-    directory_node_t *tmp = list->head;
+    entry_node_t *tmp = list->head;
     list->head = list->head->next;
     list->count--;
     if (!list->head)
@@ -59,13 +59,13 @@ directory_node_t *directory_list_pop_first(directories_list_t *list)
     return tmp;
 }
 
-void directory_list_clear(directories_list_t *list)
+void entry_list_clear(entry_list_t *list)
 {
     if (!list)
         return;
     while (list->count > 0)
     {
-        directory_node_t *tmp = directory_list_pop_first(list);
+        entry_node_t *tmp = entry_list_pop_first(list);
         free(tmp->path);
         free(tmp);
     }

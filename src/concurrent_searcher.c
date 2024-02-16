@@ -101,17 +101,17 @@ void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
         usage(argv[0]);
 
     int err;
-    directories_list_t list = directory_list_init();
+    entry_list_t list = entry_list_init();
     for (int i = optind; i < argc; i++)
-        if ((err = directory_list_push_back(&list, argv[i])) != 0)
-            ERR("directory_list_push_back", err);
+        if ((err = entry_list_push_back(&list, argv[i])) != 0)
+            ERR("entry_list_push_back", err);
 
     if (d)
     {
         file_content_t dir_content = load_file(d, LOAD_MODE_REMOVE_N);
         for (size_t i = 0; i < dir_content.lines_num; i++)
-            if ((err = directory_list_push_back(&list, dir_content.lines[i])) != 0)
-                ERR("directory_list_push_back", err);
+            if ((err = entry_list_push_back(&list, dir_content.lines[i])) != 0)
+                ERR("entry_list_push_back", err);
         file_content_clear(dir_content);
     }
 
@@ -134,7 +134,7 @@ void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
 
 void clear_arguments(concurrent_searcher_args_t *args)
 {
-    directory_list_clear(&args->dir_list);
+    entry_list_clear(&args->dir_list);
     free(args->phrase);
     free(args->output_path);
 }
@@ -163,7 +163,7 @@ void print_output(found_file_list_t *list, char *output_path)
         handle_file_close_error(output_path);
 }
 
-void initialize_thread_worker_args(thread_worker_args_t **args, directories_list_t *dir_list, found_file_list_t *file_list, int recursively, char *phrase, size_t threads_num, int follow_symlinks)
+void initialize_thread_worker_args(thread_worker_args_t **args, entry_list_t *dir_list, found_file_list_t *file_list, int recursively, char *phrase, size_t threads_num, int follow_symlinks)
 {
     pthread_mutex_t *mx_available_directory = malloc(sizeof(pthread_mutex_t));
     if (!mx_available_directory)
@@ -188,7 +188,7 @@ void initialize_thread_worker_args(thread_worker_args_t **args, directories_list
     if (pthread_mutex_init(mx_file_list, NULL))
         ERR("pthread_mutex_init", GENERAL_ERROR);
 
-    directory_node_t **dir_head = malloc(sizeof(directory_node_t *));
+    entry_node_t **dir_head = malloc(sizeof(entry_node_t *));
     if (!dir_head)
         ERR("malloc", ALLOCATION_ERROR);
 
@@ -245,7 +245,7 @@ void *thread_function(void *argp)
     thread_worker_args_t *args = argp;
 
     // search next available path
-    directory_node_t *current_dir = NULL;
+    entry_node_t *current_dir = NULL;
     do
     {
         if (pthread_mutex_lock(args->mx_available_directory))
@@ -268,9 +268,9 @@ void search_directory(char *directory_path, found_file_list_t *file_list, pthrea
     if (!dir_stream)
         handle_dir_open_error(directory_path);
 
-    directories_list_t dir_list;
+    entry_list_t dir_list;
     if (recursively)
-        dir_list = directory_list_init();
+        dir_list = entry_list_init();
 
     struct dirent *dir_entry;
     struct stat stat_buffer;
@@ -295,7 +295,7 @@ void search_directory(char *directory_path, found_file_list_t *file_list, pthrea
                 check_file(entry_path_name, file_list, mx_file_list, phrase);
 
             if (recursively && S_ISDIR(stat_buffer.st_mode) && strcmp(dir_entry->d_name, ".") && strcmp(dir_entry->d_name, ".."))
-                directory_list_push_back(&dir_list, entry_path_name);
+                entry_list_push_back(&dir_list, entry_path_name);
 
             free(entry_path_name);
         }
@@ -309,13 +309,13 @@ void search_directory(char *directory_path, found_file_list_t *file_list, pthrea
 
     if (recursively)
     {
-        directory_node_t *current = dir_list.head;
+        entry_node_t *current = dir_list.head;
         while (current)
         {
             search_directory(current->path, file_list, mx_file_list, recursively, phrase, follow_symlinks);
             current = current->next;
         }
-        directory_list_clear(&dir_list);
+        entry_list_clear(&dir_list);
     }
 }
 
