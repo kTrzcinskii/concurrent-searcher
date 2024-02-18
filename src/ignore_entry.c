@@ -35,12 +35,14 @@ void quicksort_ino(ino_t *array, size_t left, size_t right)
         size_t j = partition_ino(array, left, right);
         if (j - left < right - j)
         {
-            quicksort_ino(array, left, j - 1);
+            if (j >= left + 1)
+                quicksort_ino(array, left, j - 1);
             left = j + 1;
         }
         else
         {
-            quicksort_ino(array, j + 1, right);
+            if (j + 1 <= right)
+                quicksort_ino(array, j + 1, right);
             right = j - 1;
         }
     }
@@ -50,18 +52,17 @@ size_t partition_ino(ino_t *array, size_t left, size_t right)
 {
     ino_t v = array[right];
 
-    size_t i = left - 1;
+    size_t i = left;
     for (size_t j = left; j < right; j++)
     {
         if (array[j] <= v)
         {
-            i++;
             if (i != j)
                 swap_ino(&array[i], &array[j]);
+            i++;
         }
     }
 
-    i++;
     swap_ino(&array[i], &array[right]);
 
     return i;
@@ -88,7 +89,6 @@ int ignore_entry_contains(ignore_entry_t ignore_entry, char *name)
     }
 
     ino_t ino = st_buffer.st_ino;
-    fprintf(stderr, "\n[entry] found ino: %ld\n", ino);
 
     size_t left = 0;
     size_t right = ignore_entry.count - 1;
