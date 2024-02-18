@@ -15,30 +15,38 @@ int main(int argc, char **argv)
     read_arguments(argc, argv, &args);
 
     found_file_list_t file_list = found_file_list_init();
+    ignore_entry_t ignore_entry = {0};
+    if (args.ignore_entries_path)
+        ignore_entry = ignore_entry_create(args.ignore_entries_path);
 
-    thread_worker_args_t *worker_args;
-    initialize_thread_worker_args(&worker_args, &args.entry_list, &file_list, args.recursively, args.phrase, args.threads_num, args.follow_symlinks);
+    if (args.entry_list.count != 0)
+    {
+        thread_worker_args_t *worker_args;
+        initialize_thread_worker_args(&worker_args, &args.entry_list, &file_list, &ignore_entry, args.recursively, args.phrase, args.threads_num, args.follow_symlinks);
 
-    create_threads(worker_args, thread_function, args.threads_num);
-    join_threads(worker_args, args.threads_num);
-    destroy_thread_worker_args(worker_args, args.threads_num);
+        create_threads(worker_args, thread_function, args.threads_num);
+        join_threads(worker_args, args.threads_num);
+        destroy_thread_worker_args(worker_args, args.threads_num);
+    }
 
     print_output(&file_list, args.output_path);
 
     found_file_list_clear(&file_list);
+    ignore_entry_destroy(ignore_entry);
     clear_arguments(&args);
     return EXIT_SUCCESS;
 }
 
 void usage(char *pname)
 {
-    fprintf(stderr, "USAGE: %s [-r] [-s] [-t threads_num] [-o output_path] [-p phrase] [-i input_path] [-e entries_path] <...entries>\n", pname);
+    fprintf(stderr, "USAGE: %s [-r] [-s] [-t threads_num] [-i input_path] [-o output_path] [-n ignore_path] [-p phrase] [-e entries_path] <...entries>\n", pname);
     fprintf(stderr, "(optional) r - search directories recursively\n");
     fprintf(stderr, "(optional) s - follow symlinks\n");
     fprintf(stderr, "(optional) threads_num - number of threads to be created to concurrently search through directories. Default value is minimum from number of provided directories and max range [integer from range %d-%d]\n", MIN_THREADS_NUM, MAX_THREADS_NUM);
+    fprintf(stderr, "(optional) input_path - path to file which content will be looked for inside every file in provided directories\n");
     fprintf(stderr, "(optional) output_path - path to file in which program result should be stored. When no path is provided stdout is used\n");
+    fprintf(stderr, "(optional) ignore_path - path to file with entries (each one in new line) which should be ignored during program execution\n");
     fprintf(stderr, "phrase - phrase to be looked for inside every file in provided directories\n");
-    fprintf(stderr, "input_path - path to file which content will be looked for inside every file in provided directories\n");
     fprintf(stderr, "(optional) entries_path - path fo file with entries (each one in new line) which are appended to list of other entries provided in command line\n");
     fprintf(stderr, "entries - paths to files or directories (separated by spaces), in which phrase should be looked for. If entry is directory, then its every file is considered to be an entry. If entry is file, then it't content is checked.\n");
     fprintf(stderr, "Important note: if both phrase and input_path are provided then phrase is used. One of those argument must be passed in order to start program.");
@@ -55,8 +63,9 @@ void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
     char *o = NULL;
     char *i = NULL;
     char *e = NULL;
+    char *n = NULL;
 
-    while ((c = getopt(argc, argv, "rt:p:o:i:e:s")) != -1)
+    while ((c = getopt(argc, argv, "rt:p:o:i:e:sn:")) != -1)
     {
         switch (c)
         {
@@ -90,6 +99,11 @@ void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
             break;
         case 's':
             follow_symlinks = 1;
+            break;
+        case 'n':
+            n = strdup(optarg);
+            if (!n)
+                ERR("stdup", GENERAL_ERROR);
             break;
         case '?':
             usage(argv[0]);
@@ -130,6 +144,7 @@ void read_arguments(int argc, char **argv, concurrent_searcher_args_t *args)
     args->phrase = p;
     args->output_path = o;
     args->follow_symlinks = follow_symlinks;
+    args->ignore_entries_path = n;
 }
 
 void clear_arguments(concurrent_searcher_args_t *args)
@@ -137,6 +152,7 @@ void clear_arguments(concurrent_searcher_args_t *args)
     entry_list_clear(&args->entry_list);
     free(args->phrase);
     free(args->output_path);
+    free(args->ignore_entries_path);
 }
 
 void print_output(found_file_list_t *list, char *output_path)
@@ -163,7 +179,7 @@ void print_output(found_file_list_t *list, char *output_path)
         handle_file_close_error(output_path);
 }
 
-void initialize_thread_worker_args(thread_worker_args_t **args, entry_list_t *entry_list, found_file_list_t *file_list, int recursively, char *phrase, size_t threads_num, int follow_symlinks)
+void initialize_thread_worker_args(thread_worker_args_t **args, entry_list_t *entry_list, found_file_list_t *file_list, ignore_entry_t *ignore_entry, int recursively, char *phrase, size_t threads_num, int follow_symlinks)
 {
     pthread_mutex_t *mx_available_entry = malloc(sizeof(pthread_mutex_t));
     if (!mx_available_entry)
@@ -206,6 +222,7 @@ void initialize_thread_worker_args(thread_worker_args_t **args, entry_list_t *en
         (*args)[i].recursively = recursively;
         (*args)[i].phrase = p;
         (*args)[i].follow_symlinks = follow_symlinks;
+        (*args)[i].ignore_entry = ignore_entry;
     }
 }
 
@@ -259,6 +276,8 @@ void *thread_function(void *argp)
             ERR("ptrhead_mutex_unlock", GENERAL_ERROR);
         if (current_entry)
         {
+            if (ignore_entry_contains(*args->ignore_entry, current_entry->path))
+                continue;
             if (args->follow_symlinks)
             {
                 if (stat(current_entry->path, &stat_buffer))
@@ -272,14 +291,14 @@ void *thread_function(void *argp)
             if (S_ISREG(stat_buffer.st_mode))
                 check_file(current_entry->path, args->file_list, args->mx_file_list, args->phrase);
             else
-                search_directory(current_entry->path, args->file_list, args->mx_file_list, args->recursively, args->phrase, args->follow_symlinks);
+                search_directory(current_entry->path, args->file_list, args->mx_file_list, args->ignore_entry, args->recursively, args->phrase, args->follow_symlinks);
         }
     } while (current_entry);
 
     return NULL;
 }
 
-void search_directory(char *directory_path, found_file_list_t *file_list, pthread_mutex_t *mx_file_list, int recursively, char *phrase, int follow_symlinks)
+void search_directory(char *directory_path, found_file_list_t *file_list, pthread_mutex_t *mx_file_list, ignore_entry_t *ignore_entry, int recursively, char *phrase, int follow_symlinks)
 {
     DIR *dir_stream = opendir(directory_path);
     if (!dir_stream)
@@ -297,6 +316,11 @@ void search_directory(char *directory_path, found_file_list_t *file_list, pthrea
         if ((dir_entry = readdir(dir_stream)) != NULL)
         {
             char *entry_path_name = combine_paths(directory_path, dir_entry->d_name);
+            if (ignore_entry_contains(*ignore_entry, entry_path_name))
+            {
+                free(entry_path_name);
+                continue;
+            }
             if (follow_symlinks)
             {
                 if (stat(entry_path_name, &stat_buffer))
@@ -329,7 +353,7 @@ void search_directory(char *directory_path, found_file_list_t *file_list, pthrea
         entry_node_t *current = dir_list.head;
         while (current)
         {
-            search_directory(current->path, file_list, mx_file_list, recursively, phrase, follow_symlinks);
+            search_directory(current->path, file_list, mx_file_list, ignore_entry, recursively, phrase, follow_symlinks);
             current = current->next;
         }
         entry_list_clear(&dir_list);
