@@ -34,11 +34,13 @@ Compiled file is waiting for being used at `./build/concurrent_searcher`.
 | Output path      | -o     | Path to file, in which program output should be stored. If no path is provided then output is returned using stdout.       | Yes            | string               | Yes      |
 | Entries path     | -e     | Path to file, which every line should be added as new entry in `Entries`.                                                  | Yes            | string               | Yes      |
 | Threads number   | -t     | Number of threads to be initialized. Default value is minimum of max range number (16) and number of provided entries.     | Yes            | number in range 1-16 | Yes      |
-| Follow symlinks  | -s     | If passed then symlinks are followed (otherwise they're ignored).                                                          | No            | - | Yes      |
+| Follow symlinks  | -s     | If passed then symlinks are followed (otherwise they're ignored).                                                          | No             | -                    | Yes      |
+| Ignore path      | -n     | Path to file, which every line is path to file/directory that will not be checked for containing `Phrase`                  | Yes            | string               | Yes      |
 
 **Important notes**: 
  - always one of parameters `Phrase` and `Input path` must be passed. If both are passed then only `Phrase` is used.
  - If `Follow symlinks` is passed and it points to a file that is also checked during program runtime then **both** original file and symlink paths will be in the output. 
+ - `Ignore path` is implemented using `inode` and it always follows symlinks, so if there is only a symlink in `Ignore path` then even original file will be ignored.
 
 **Examples**:
  - Basic example - searching for "i love/hate c" in every file in directory `./very_cool_directory` recursively:
@@ -75,6 +77,7 @@ where each `found_position` is of form:
 - To store directories and files in which `Phrase` was found I used the very basic type of linked-list (`directories_list_t` and `found_files_list_t`).
 - To search for phrase in files I used Knuth-Morris-Pratt algorithm.
 - To implement multi-threading I used `pthread` library.
+- To store `inodes` of ignored files I use dynamic array. It's sorted at the beginning (using `quicksort`). For checking if array contains specific `inode` binary search is used.
 
 ## References
 - [Wikipedia - Knuth–Morris–Pratt algorithm](https://en.wikipedia.org/wiki/Knuth%E2%80%93Morris%E2%80%93Pratt_algorithm)
